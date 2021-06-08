@@ -1,0 +1,7 @@
+---
+title: "Analyze disaggregated US CPI data"
+author: "Philipp Hauber"
+date: "June 8, 2021"
+output: html_notebook
+---
+
