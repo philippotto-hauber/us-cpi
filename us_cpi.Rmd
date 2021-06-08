@@ -11,6 +11,7 @@ Source: [BLS](https://download.bls.gov/pub/time.series/cu/)
 library(dplyr)
 library(tidyr)
 library(readxl)
+library(stringr)
 library(lubridate)
 ```
 
@@ -25,7 +26,7 @@ Download all series and keep all observations after and including 2020M1
 ```{r}
 raw_dat <- read.table("https://download.bls.gov/pub/time.series/cu/cu.data.0.Current", sep="\t", header=TRUE)
 
-df_series <- filter(raw_dat, year >= 2020)
+df_series <- filter(raw_dat, year >= 2019)
 rm(raw_dat)
 ```
 
@@ -58,11 +59,11 @@ df_series %>%
 [Link to series names](https://download.bls.gov/pub/time.series/cu/cu.item)
 
 ```{r}
-raw_names <- read.table(file = "https://download.bls.gov/pub/time.series/cu/cu.item", sep = "\t", header=T)
+raw_names <- read.table(file = "https://download.bls.gov/pub/time.series/cu/cu.item", sep = "\t", header=T, stringsAsFactors = F, quote = "")
 
 df_names <- select(raw_names, item_code, item_name, display_level)
 
-rm(raw_names)
+#rm(raw_names)
 ```
 
 ## Download weights of CPI series
@@ -90,7 +91,7 @@ df_weights <- raw_weights[seq(6, nrow(raw_weights)), seq(1, 3)]
 names(df_weights) <- c("level", "name", "weight")
 df_weights %>%
   mutate(level = factor(as.integer(level)),
-         weight = as.numeric(weight),
+         weight = round(as.numeric(weight), digits = 2),
          name = sapply(name, gsub, pattern = "\\(.\\)", replacement = ""),
          name = sapply(name, gsub, pattern = "\\(..\\)", replacement = "")) %>%
   filter(!is.na(weight)) -> df_weights
@@ -100,7 +101,7 @@ df_weights %>%
 ### Calculate category (food, goods, services, energy)
 
 ```{r}
-df_weights$category <- "goods"
+df_weights$category <- "Goods"
 
 
 start_food <- which(df_weights$name == "Food")
@@ -114,12 +115,173 @@ df_weights$category[seq(start_energy, end_energy)] <- "Energy"
 start_services <- which(df_weights$name == "Services less energy services")
 end_services <- which(df_weights$name == "Financial services")
 df_weights$category[seq(start_services, end_services)] <- "Services"
+
+df_weights$category[df_weights$name == "All items"] <- "Total"
+df_weights$category[df_weights$name == "All items less food and energy"] <- "Total ex energy and food"
 ```
 
 ## Combine into one dataset
 
 ```{r}
+df <- merge(df_series, df_names, by.x = "series", by.y = "item_code")
+
+df <- merge(df, df_weights, by.x = "item_name", by.y = "name")
+```
+
+The `level` from the Supplemental Table does not match with `display_level` from the raw series. However, as I am unsure what the latter actually refers to, I discard it. 
+
+```{r}
+df <- select(df, year, month, series, name = item_name, value, weight, category, level)
+```
+
+# Analysis
+
+
+## Auxiliary functions
+
+```{r}
+growth_rate <- function(x, ys, ms, y1, m1, y2, m2)
+#calculate growth rate of the CPI index between y1m1 and y2m2
+{
+  ind1 <- which(ys == y1 & ms == m1)
+  ind2 <- which(ys == y2 & ms == m2)
+  return(x[ind2] / x[ind1] * 100 - 100)
+}
+```
+
+```{r}
+rebase_index <- function(x, ys, ms, y0, m0)
+# rebase index to 100 in y0m0
+{
+  ind0 <- which(ys == y0 & ms == m0) 
+  return(x / x[ind0] * 100)
+}
+```
+
+
+## Distribution of m/m changes in April 2021
+
+
+```{r}
+df %>% 
+    filter(level == 3) %>%
+  group_by(name, weight, category) %>%
+  summarise(mm_apr21 = round(growth_rate(value, year, month, 2021, 3, 2021, 4), digits = 2)
+            ) %>%
+  mutate(mm_apr21_weighted = mm_apr21 * weight / 100) %>%
+  pivot_longer(cols = c("mm_apr21", "mm_apr21_weighted"), names_to = "variable", values_to = "value") -> df_plot
+
+ggplot(df_plot)+
+  geom_histogram(aes(x = value), bins = 100, fill = "steelblue")+
+  facet_wrap(~variable, nrow = 2, scales = "free_x")
 
 ```
+
+
+## Plot all time series
+
+```{r}
+df %>% 
+  mutate(date = make_date(year = year, month = month)) %>%
+  group_by(series, category, level) %>%
+  mutate(value_rebased = rebase_index(value, year, month, 2020, 2)) %>%
+  ggplot(aes(x = date, y = value_rebased, group = series, color = category))+
+  geom_line(aes(linestyle = level))+
+  geom_point()+
+  scale_color_jco()
+```
+
+
+## Top movers in April 2021
+
+```{r}
+df %>% 
+  filter(level %in% c(4, 5, 6, 7, 8), !(category %in% c("Energy", "Food"))) %>%
+  group_by(name, weight, category) %>%
+  summarise(
+            diff_apr21 = round(growth_rate(value, year, month, 2020, 2, 2021, 4), digits = 2),
+            mm_apr21 = round(growth_rate(value, year, month, 2021, 3, 2021, 4), digits = 2)
+            ) %>%
+  arrange(desc(mm_apr21)) %>%
+  select(name, mm_apr21, diff_apr21, weight, category) %>%
+  head(20) -> df_plot
+
+  df_plot
+```
+
+
+### Plot
+
+```{r}
+ggplot(df_plot, aes(x = diff_apr21, y = mm_apr21))+
+  geom_point(aes(color = category, size = weight))+
+  scale_color_jco()+
+  ylim(c(0, 18))+
+  scale_size(breaks = c(0.1, 0.5, 2), labels = c("0.1%", "0.5%", "2%"))+
+  labs(title = "Vereinigte Staaten: Verbraucherpreisindex",
+       subtitle = "20 Waren und Dienstleistungen (ohne Energie und Lebensmittel) mit der höchsten Monatsrate im April 2021",
+       caption = "Quelle: Bureau of Labor Statistics, eigene Berechnungen.",
+       y="Veränderung April 2021 ggü. März 2021",
+       x = "Veränderung April 2021 ggü. Februar 2020")+
+  geom_vline(xintercept = 0)+
+  geom_text(mapping = aes(x = diff_apr21, y = mm_apr21, label = name), 
+            data = filter(df_plot, name %in% c("Car and truck rental", 
+                                               "Airline fares", 
+                                               "Used cars and trucks",
+                                               "Other lodging away from home including hotels and motels",
+                                               "Lodging away from home",
+                                               "Public transportation")
+                          ),
+            size = 4,
+            nudge_x = 0.4,
+            nudge_y = 0.4)
+```
+
+
+```{r}
+ggsave(filename = "plot_cpi_US.pdf", width = 12, height = 6, units = "in")
+```
+
+
+
+### Level 3
+
+```{r}
+df_plot <- filter(df, level == 3)
+
+barplot(df_plot$weight)
+```
+
+
+Plot the change in the CPI since the pandemic (February 2020) and m/m-change in April 2021 
+
+
+```{r}
+df_plot %>% 
+  group_by(series, category, weight, name) %>%
+  summarise(diff_apr21 = growth_rate(value, year, month, 2020, 2, 2021, 4),
+            mm_apr21 = growth_rate(value, year, month, 2021, 3, 2021, 4)) %>%
+  ggplot(aes(x = diff_apr21, y = mm_apr21))+
+  geom_point(aes(color = category, size = weight))+
+  scale_size(breaks = c(1, 5, 10), labels = c("1%", "5%", "10%"))+
+  scale_color_jco()+
+  geom_text(aes(label = name), size = 2)
+```
+
+Zoom in on smaller changes
+
+```{r}
+df_plot %>% 
+  group_by(series, category, weight, name) %>%
+  summarise(diff_apr21 = growth_rate(value, year, month, 2020, 2, 2021, 4),
+            mm_apr21 = growth_rate(value, year, month, 2021, 3, 2021, 4)) %>%
+  ggplot(aes(x = diff_apr21, y = mm_apr21, color = category, size = weight))+
+  geom_point()+
+  scale_size(breaks = c(1, 5, 10), labels = c("1%", "5%", "10%"))+
+  scale_color_jco()+
+  facet_zoom(xlim = c(-5, 10), ylim = c(-2, 5))
+```
+
+
 
 
