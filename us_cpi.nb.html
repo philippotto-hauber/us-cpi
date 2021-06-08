@@ -1766,9 +1766,180 @@ summary {
 
 
 <!-- rnb-text-begin -->
+<p>Source: <a href="https://download.bls.gov/pub/time.series/cu/">BLS</a></p>
 <!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShkcGx5cilcbmBgYCJ9 -->
+<pre class="r"><code>library(dplyr)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoicmVwbGFjaW5nIHByZXZpb3VzIGltcG9ydCDjpLzjuLF2Y3Ryczo6ZGF0YV9mcmFtZeOkvOO4siBieSDjpLzjuLF0aWJibGU6OmRhdGFfZnJhbWXjpLzjuLIgd2hlbiBsb2FkaW5nIOOkvOO4sWRwbHly46S847iyXG5BdHRhY2hlIFBha2V0OiDjpLzjuLFkcGx5cuOkvOO4slxuXG5UaGUgZm9sbG93aW5nIG9iamVjdHMgYXJlIG1hc2tlZCBmcm9tIOOkvOO4sXBhY2thZ2U6c3RhdHPjpLzjuLI6XG5cbiAgICBmaWx0ZXIsIGxhZ1xuXG5UaGUgZm9sbG93aW5nIG9iamVjdHMgYXJlIG1hc2tlZCBmcm9tIOOkvOO4sXBhY2thZ2U6YmFzZeOkvOO4sjpcblxuICAgIGludGVyc2VjdCwgc2V0ZGlmZiwgc2V0ZXF1YWwsIHVuaW9uXG4ifQ== -->
+<pre><code>replacing previous import 㤼㸱vctrs::data_frame㤼㸲 by 㤼㸱tibble::data_frame㤼㸲 when loading 㤼㸱dplyr㤼㸲
+Attache Paket: 㤼㸱dplyr㤼㸲
 
-<div id="rmd-source-code">LS0tDQp0aXRsZTogIkFuYWx5emUgZGlzYWdncmVnYXRlZCBVUyBDUEkgZGF0YSINCmF1dGhvcjogIlBoaWxpcHAgSGF1YmVyIg0KZGF0ZTogIkp1bmUgOCwgMjAyMSINCm91dHB1dDogaHRtbF9ub3RlYm9vaw0KLS0tDQoNCg==</div>
+The following objects are masked from 㤼㸱package:stats㤼㸲:
+
+    filter, lag
+
+The following objects are masked from 㤼㸱package:base㤼㸲:
+
+    intersect, setdiff, setequal, union</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeSh0aWR5cilcbmxpYnJhcnkocmVhZHhsKVxubGlicmFyeShsdWJyaWRhdGUpXG5gYGAifQ== -->
+<pre class="r"><code>library(tidyr)
+library(readxl)
+library(lubridate)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiXG5BdHRhY2hlIFBha2V0OiDjpLzjuLFsdWJyaWRhdGXjpLzjuLJcblxuVGhlIGZvbGxvd2luZyBvYmplY3RzIGFyZSBtYXNrZWQgZnJvbSDjpLzjuLFwYWNrYWdlOmJhc2XjpLzjuLI6XG5cbiAgICBkYXRlLCBpbnRlcnNlY3QsIHNldGRpZmYsIHVuaW9uXG4ifQ== -->
+<pre><code>
+Attache Paket: 㤼㸱lubridate㤼㸲
+
+The following objects are masked from 㤼㸱package:base㤼㸲:
+
+    date, intersect, setdiff, union</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<div id="data" class="section level1">
+<h1>Data</h1>
+<div id="download-cpi-series" class="section level2">
+<h2>Download CPI series</h2>
+<p><a href="https://download.bls.gov/pub/time.series/cu/cu.data.0.Current">Link to bulk download of all series</a> Download all series and keep all observations after and including 2020M1</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucmF3X2RhdCA8LSByZWFkLnRhYmxlKFwiaHR0cHM6Ly9kb3dubG9hZC5ibHMuZ292L3B1Yi90aW1lLnNlcmllcy9jdS9jdS5kYXRhLjAuQ3VycmVudFwiLCBzZXA9XCJcXHRcIiwgaGVhZGVyPVRSVUUpXG5cbmRhdCA8LSBmaWx0ZXIoZGF0LCB5ZWFyID49IDIwMjApXG5gYGAifQ== -->
+<pre class="r"><code>raw_dat &lt;- read.table(&quot;https://download.bls.gov/pub/time.series/cu/cu.data.0.Current&quot;, sep=&quot;\t&quot;, header=TRUE)
+
+dat &lt;- filter(dat, year &gt;= 2020)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiRmVobGVyIGluIGZpbHRlcihkYXQsIHllYXIgPj0gMjAyMCkgOiBPYmpla3QgJ2RhdCcgbmljaHQgZ2VmdW5kZW5cbiJ9 -->
+<pre><code>Fehler in filter(dat, year &gt;= 2020) : Objekt &#39;dat&#39; nicht gefunden</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Convert month to numeric variables and keep only monthly observations (discarding semi-annual and annual CPI levels)</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Split <code>series_id</code> into series code, filter <code>area</code> for <strong>All city average</strong> and <code>sa</code> for seasonally adjusted data <strong>S</strong></p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="download-names-of-cpi-series" class="section level2">
+<h2>Download names of CPI series</h2>
+<p><a href="https://download.bls.gov/pub/time.series/cu/cu.item">Link to series names</a></p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucmF3X25hbWVzIDwtIHJlYWQudGFibGUoZmlsZSA9IFwiaHR0cHM6Ly9kb3dubG9hZC5ibHMuZ292L3B1Yi90aW1lLnNlcmllcy9jdS9jdS5pdGVtXCIsIHNlcCA9IFwiXFx0XCIsIGhlYWRlcj1UKVxuXG5kZl9uYW1lcyA8LSBzZWxlY3QocmF3X25hbWVzLCBpdGVtX2NvZGUsIGl0ZW1fbmFtZSwgZGlzcGxheV9sZXZlbClcbmBgYCJ9 -->
+<pre class="r"><code>raw_names &lt;- read.table(file = &quot;https://download.bls.gov/pub/time.series/cu/cu.item&quot;, sep = &quot;\t&quot;, header=T)
+
+df_names &lt;- select(raw_names, item_code, item_name, display_level)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="download-weights-of-cpi-series" class="section level2">
+<h2>Download weights of CPI series</h2>
+<p>The corresponding weights of the CPI needed to be downloaded from the <a href="https://www.bls.gov/cpi/tables/supplemental-files/home.htm">Supplemental Files</a>. The link below needs to be adjusted with every new release!</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxudXJsIDwtIFwiaHR0cHM6Ly93d3cuYmxzLmdvdi9jcGkvdGFibGVzL3N1cHBsZW1lbnRhbC1maWxlcy9uZXdzLXJlbGVhc2UtdGFibGUyLTIwMjEwNC54bHN4XCJcbmBgYCJ9 -->
+<pre class="r"><code>url &lt;- &quot;https://www.bls.gov/cpi/tables/supplemental-files/news-release-table2-202104.xlsx&quot;</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiRXMgZ2FiIDE4IFdhcm51bmdlbiAoQW56ZWlnZSBtaXQgd2FybmluZ3MoKSlcbiJ9 -->
+<pre><code>Es gab 18 Warnungen (Anzeige mit warnings())</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZm4gPC0gXCJjcGlfd2VpZ2h0cy54bHN4XCJcbmRvd25sb2FkLmZpbGUodXJsID0gdXJsICwgZGVzdGZpbGUgPSBmbiwgbW9kZSA9IFwid2JcIilcbmBgYCJ9 -->
+<pre class="r"><code>fn &lt;- &quot;cpi_weights.xlsx&quot;
+download.file(url = url , destfile = fn, mode = &quot;wb&quot;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoidmVyc3VjaGUgVVJMICdodHRwczovL3d3dy5ibHMuZ292L2NwaS90YWJsZXMvc3VwcGxlbWVudGFsLWZpbGVzL25ld3MtcmVsZWFzZS10YWJsZTItMjAyMTA0Lnhsc3gnXG5Db250ZW50IHR5cGUgJ2FwcGxpY2F0aW9uL3ZuZC5vcGVueG1sZm9ybWF0cy1vZmZpY2Vkb2N1bWVudC5zcHJlYWRzaGVldG1sLnNoZWV0JyBsZW5ndGggMjI4MjMgYnl0ZXMgKDIyIEtCKVxuZG93bmxvYWRlZCAyMiBLQlxuIn0= -->
+<pre><code>versuche URL &#39;https://www.bls.gov/cpi/tables/supplemental-files/news-release-table2-202104.xlsx&#39;
+Content type &#39;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&#39; length 22823 bytes (22 KB)
+downloaded 22 KB</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucmF3X3dlaWdodHMgPC0gcmVhZF9leGNlbChwYXRoID0gZm4pXG5gYGAifQ== -->
+<pre class="r"><code>raw_weights &lt;- read_excel(path = fn)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiTmV3IG5hbWVzOlxuKiBgYCAtPiAuLi4xXG4qIGBgIC0+IC4uLjNcbiogYGAgLT4gLi4uNFxuKiBgYCAtPiAuLi41XG4qIGBgIC0+IC4uLjZcbiogLi4uXG4ifQ== -->
+<pre><code>New names:
+* `` -&gt; ...1
+* `` -&gt; ...3
+* `` -&gt; ...4
+* `` -&gt; ...5
+* `` -&gt; ...6
+* ...</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZmlsZS5yZW1vdmUoZm4pXG5gYGAifQ== -->
+<pre class="r"><code>file.remove(fn)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiWzFdIFRSVUVcbiJ9 -->
+<pre><code>[1] TRUE</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZGZfd2VpZ2h0cyA8LSByYXdfd2VpZ2h0c1tzZXEoNiwgbnJvdyhyYXdfd2VpZ2h0cykpLCBzZXEoMSwgMyldXG5gYGAifQ== -->
+<pre class="r"><code>df_weights &lt;- raw_weights[seq(6, nrow(raw_weights)), seq(1, 3)]</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<div id="transformations" class="section level3">
+<h3>Transformations</h3>
+<ul>
+<li>Change column names</li>
+<li>remove single- and double-digit footnotes from <code>name</code></li>
+<li>convert weights to numeric, level to integer (and factor)</li>
+<li>remove <code>NA</code>, blank lines</li>
+</ul>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubmFtZXMoZGZfd2VpZ2h0cykgPC0gYyhcImxldmVsXCIsIFwibmFtZVwiLCBcIndlaWdodFwiKVxuZGZfd2VpZ2h0cyAlPiVcbiAgbXV0YXRlKGxldmVsID0gZmFjdG9yKGFzLmludGVnZXIobGV2ZWwpKSxcbiAgICAgICAgIHdlaWdodCA9IGFzLm51bWVyaWMod2VpZ2h0KSxcbiAgICAgICAgIG5hbWUgPSBzYXBwbHkobmFtZSwgZ3N1YiwgcGF0dGVybiA9IFwiXFxcXCguXFxcXClcIiwgcmVwbGFjZW1lbnQgPSBcIlwiKSxcbiAgICAgICAgIG5hbWUgPSBzYXBwbHkobmFtZSwgZ3N1YiwgcGF0dGVybiA9IFwiXFxcXCguLlxcXFwpXCIsIHJlcGxhY2VtZW50ID0gXCJcIikpICU+JVxuICBmaWx0ZXIoIWlzLm5hKHdlaWdodCkpIC0+IGRmX3dlaWdodHNcbmBgYCJ9 -->
+<pre class="r"><code>names(df_weights) &lt;- c(&quot;level&quot;, &quot;name&quot;, &quot;weight&quot;)
+df_weights %&gt;%
+  mutate(level = factor(as.integer(level)),
+         weight = as.numeric(weight),
+         name = sapply(name, gsub, pattern = &quot;\\(.\\)&quot;, replacement = &quot;&quot;),
+         name = sapply(name, gsub, pattern = &quot;\\(..\\)&quot;, replacement = &quot;&quot;)) %&gt;%
+  filter(!is.na(weight)) -&gt; df_weights</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="calculate-category-food-goods-services-energy" class="section level3">
+<h3>Calculate category (food, goods, services, energy)</h3>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZGZfd2VpZ2h0cyRjYXRlZ29yeSA8LSBcImdvb2RzXCJcblxuXG5zdGFydF9mb29kIDwtIHdoaWNoKGRmX3dlaWdodHMkbmFtZSA9PSBcIkZvb2RcIilcbmVuZF9mb29kIDwtIHdoaWNoKGRmX3dlaWdodHMkbmFtZSA9PSBcIk90aGVyIGZvb2QgYXdheSBmcm9tIGhvbWVcIilcbmRmX3dlaWdodHMkY2F0ZWdvcnlbc2VxKHN0YXJ0X2Zvb2QsIGVuZF9mb29kKV0gPC0gXCJGb29kXCJcblxuc3RhcnRfZW5lcmd5IDwtIHdoaWNoKGRmX3dlaWdodHMkbmFtZSA9PSBcIkVuZXJneVwiKVxuZW5kX2VuZXJneSA8LSB3aGljaChkZl93ZWlnaHRzJG5hbWUgPT0gXCJVdGlsaXR5IChwaXBlZCkgZ2FzIHNlcnZpY2VcIilcbmRmX3dlaWdodHMkY2F0ZWdvcnlbc2VxKHN0YXJ0X2VuZXJneSwgZW5kX2VuZXJneSldIDwtIFwiRW5lcmd5XCJcblxuc3RhcnRfc2VydmljZXMgPC0gd2hpY2goZGZfd2VpZ2h0cyRuYW1lID09IFwiU2VydmljZXMgbGVzcyBlbmVyZ3kgc2VydmljZXNcIilcbmVuZF9zZXJ2aWNlcyA8LSB3aGljaChkZl93ZWlnaHRzJG5hbWUgPT0gXCJGaW5hbmNpYWwgc2VydmljZXNcIilcbmRmX3dlaWdodHMkY2F0ZWdvcnlbc2VxKHN0YXJ0X3NlcnZpY2VzLCBlbmRfc2VydmljZXMpXSA8LSBcIlNlcnZpY2VzXCJcbmBgYCJ9 -->
+<pre class="r"><code>df_weights$category &lt;- &quot;goods&quot;
+
+
+start_food &lt;- which(df_weights$name == &quot;Food&quot;)
+end_food &lt;- which(df_weights$name == &quot;Other food away from home&quot;)
+df_weights$category[seq(start_food, end_food)] &lt;- &quot;Food&quot;
+
+start_energy &lt;- which(df_weights$name == &quot;Energy&quot;)
+end_energy &lt;- which(df_weights$name == &quot;Utility (piped) gas service&quot;)
+df_weights$category[seq(start_energy, end_energy)] &lt;- &quot;Energy&quot;
+
+start_services &lt;- which(df_weights$name == &quot;Services less energy services&quot;)
+end_services &lt;- which(df_weights$name == &quot;Financial services&quot;)
+df_weights$category[seq(start_services, end_services)] &lt;- &quot;Services&quot;</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+</div>
+<div id="combine-into-one-dataset" class="section level2">
+<h2>Combine into one dataset</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<!-- rnb-text-end -->
+</div>
+</div>
+
+<div id="rmd-source-code">LS0tDQp0aXRsZTogIkFuYWx5emUgZGlzYWdncmVnYXRlZCBVUyBDUEkgZGF0YSINCmF1dGhvcjogIlBoaWxpcHAgSGF1YmVyIg0KZGF0ZTogIkp1bmUgOCwgMjAyMSINCm91dHB1dDogaHRtbF9ub3RlYm9vaw0KLS0tDQoNClNvdXJjZTogW0JMU10oaHR0cHM6Ly9kb3dubG9hZC5ibHMuZ292L3B1Yi90aW1lLnNlcmllcy9jdS8pDQoNCmBgYHtyfQ0KbGlicmFyeShkcGx5cikNCmxpYnJhcnkodGlkeXIpDQpsaWJyYXJ5KHJlYWR4bCkNCmxpYnJhcnkobHVicmlkYXRlKQ0KYGBgDQoNCg0KIyBEYXRhDQoNCiMjIERvd25sb2FkIENQSSBzZXJpZXMNCg0KW0xpbmsgdG8gYnVsayBkb3dubG9hZCBvZiBhbGwgc2VyaWVzXShodHRwczovL2Rvd25sb2FkLmJscy5nb3YvcHViL3RpbWUuc2VyaWVzL2N1L2N1LmRhdGEuMC5DdXJyZW50KQ0KRG93bmxvYWQgYWxsIHNlcmllcyBhbmQga2VlcCBhbGwgb2JzZXJ2YXRpb25zIGFmdGVyIGFuZCBpbmNsdWRpbmcgMjAyME0xDQoNCmBgYHtyfQ0KcmF3X2RhdCA8LSByZWFkLnRhYmxlKCJodHRwczovL2Rvd25sb2FkLmJscy5nb3YvcHViL3RpbWUuc2VyaWVzL2N1L2N1LmRhdGEuMC5DdXJyZW50Iiwgc2VwPSJcdCIsIGhlYWRlcj1UUlVFKQ0KDQpkZl9zZXJpZXMgPC0gZmlsdGVyKHJhd19kYXQsIHllYXIgPj0gMjAyMCkNCnJtKHJhd19kYXQpDQpgYGANCg0KQ29udmVydCBtb250aCB0byBudW1lcmljIHZhcmlhYmxlcyBhbmQga2VlcCBvbmx5IG1vbnRobHkgb2JzZXJ2YXRpb25zIChkaXNjYXJkaW5nIHNlbWktYW5udWFsIGFuZCBhbm51YWwgQ1BJIGxldmVscykNCg0KYGBge3J9DQpkZl9zZXJpZXMgJT4lIA0KICBzZXBhcmF0ZShwZXJpb2QsIGludG8gPSBjKCJ0bXAiLCAibW9udGgiKSwgc2VwID0gMSkgJT4lDQogIGZpbHRlcih0bXAgPT0gIk0iKSAlPiUNCiAgc2VsZWN0KC10bXAsIC1mb290bm90ZV9jb2RlcykgJT4lDQogIG11dGF0ZShtb250aCA9IGFzLm51bWVyaWMobW9udGgpKSAtPiBkZl9zZXJpZXMNCmBgYA0KDQpTcGxpdCBgc2VyaWVzX2lkYCBpbnRvIHNlcmllcyBjb2RlLCBmaWx0ZXIgYGFyZWFgIGZvciAqKkFsbCBjaXR5IGF2ZXJhZ2UqKiBhbmQgYHNhYCBmb3Igc2Vhc29uYWxseSBhZGp1c3RlZCBkYXRhICoqUyoqDQoNCmBgYHtyfQ0KZGZfc2VyaWVzICU+JQ0KICBzZXBhcmF0ZShzZXJpZXNfaWQsIA0KICAgICAgICAgICBpbnRvID0gYygidG1wIiwgInNhIiwgInRtcDIiLCAiYXJlYSIsICJzZXJpZXMiKSwgDQogICAgICAgICAgIHNlcCA9IGMoMiwzLDQsOCkNCiAgICAgICAgICAgKSAlPiUNCiAgZmlsdGVyKGFyZWEgPT0gIjAwMDAiLA0KICAgICAgICAgc2EgPT0gIlMiKSAlPiUNCiAgbXV0YXRlKHNlcmllcyA9IHN0cl90cmltKHNlcmllcykpICU+JQ0KICBzZWxlY3QoLXRtcCwgLXRtcDIsIC1hcmVhLCAtc2EpIC0+IGRmX3Nlcmllcw0KYGBgDQoNCiMjIERvd25sb2FkIG5hbWVzIG9mIENQSSBzZXJpZXMNCg0KW0xpbmsgdG8gc2VyaWVzIG5hbWVzXShodHRwczovL2Rvd25sb2FkLmJscy5nb3YvcHViL3RpbWUuc2VyaWVzL2N1L2N1Lml0ZW0pDQoNCmBgYHtyfQ0KcmF3X25hbWVzIDwtIHJlYWQudGFibGUoZmlsZSA9ICJodHRwczovL2Rvd25sb2FkLmJscy5nb3YvcHViL3RpbWUuc2VyaWVzL2N1L2N1Lml0ZW0iLCBzZXAgPSAiXHQiLCBoZWFkZXI9VCkNCg0KZGZfbmFtZXMgPC0gc2VsZWN0KHJhd19uYW1lcywgaXRlbV9jb2RlLCBpdGVtX25hbWUsIGRpc3BsYXlfbGV2ZWwpDQoNCnJtKHJhd19uYW1lcykNCmBgYA0KDQojIyBEb3dubG9hZCB3ZWlnaHRzIG9mIENQSSBzZXJpZXMNCg0KVGhlIGNvcnJlc3BvbmRpbmcgd2VpZ2h0cyBvZiB0aGUgQ1BJIG5lZWRlZCB0byBiZSBkb3dubG9hZGVkIGZyb20gdGhlIFtTdXBwbGVtZW50YWwgRmlsZXNdKGh0dHBzOi8vd3d3LmJscy5nb3YvY3BpL3RhYmxlcy9zdXBwbGVtZW50YWwtZmlsZXMvaG9tZS5odG0pLiBUaGUgbGluayBiZWxvdyBuZWVkcyB0byBiZSBhZGp1c3RlZCB3aXRoIGV2ZXJ5IG5ldyByZWxlYXNlISANCg0KYGBge3J9DQp1cmwgPC0gImh0dHBzOi8vd3d3LmJscy5nb3YvY3BpL3RhYmxlcy9zdXBwbGVtZW50YWwtZmlsZXMvbmV3cy1yZWxlYXNlLXRhYmxlMi0yMDIxMDQueGxzeCINCmZuIDwtICJjcGlfd2VpZ2h0cy54bHN4Ig0KZG93bmxvYWQuZmlsZSh1cmwgPSB1cmwgLCBkZXN0ZmlsZSA9IGZuLCBtb2RlID0gIndiIikNCnJhd193ZWlnaHRzIDwtIHJlYWRfZXhjZWwocGF0aCA9IGZuKQ0KZmlsZS5yZW1vdmUoZm4pDQoNCmRmX3dlaWdodHMgPC0gcmF3X3dlaWdodHNbc2VxKDYsIG5yb3cocmF3X3dlaWdodHMpKSwgc2VxKDEsIDMpXQ0KYGBgDQoNCiMjIyBUcmFuc2Zvcm1hdGlvbnMNCg0KLSBDaGFuZ2UgY29sdW1uIG5hbWVzDQotIHJlbW92ZSBzaW5nbGUtIGFuZCBkb3VibGUtZGlnaXQgZm9vdG5vdGVzIGZyb20gYG5hbWVgDQotIGNvbnZlcnQgd2VpZ2h0cyB0byBudW1lcmljLCBsZXZlbCB0byBpbnRlZ2VyIChhbmQgZmFjdG9yKQ0KLSByZW1vdmUgYE5BYCwgYmxhbmsgbGluZXMNCg0KYGBge3J9DQpuYW1lcyhkZl93ZWlnaHRzKSA8LSBjKCJsZXZlbCIsICJuYW1lIiwgIndlaWdodCIpDQpkZl93ZWlnaHRzICU+JQ0KICBtdXRhdGUobGV2ZWwgPSBmYWN0b3IoYXMuaW50ZWdlcihsZXZlbCkpLA0KICAgICAgICAgd2VpZ2h0ID0gYXMubnVtZXJpYyh3ZWlnaHQpLA0KICAgICAgICAgbmFtZSA9IHNhcHBseShuYW1lLCBnc3ViLCBwYXR0ZXJuID0gIlxcKC5cXCkiLCByZXBsYWNlbWVudCA9ICIiKSwNCiAgICAgICAgIG5hbWUgPSBzYXBwbHkobmFtZSwgZ3N1YiwgcGF0dGVybiA9ICJcXCguLlxcKSIsIHJlcGxhY2VtZW50ID0gIiIpKSAlPiUNCiAgZmlsdGVyKCFpcy5uYSh3ZWlnaHQpKSAtPiBkZl93ZWlnaHRzDQpgYGANCg0KDQojIyMgQ2FsY3VsYXRlIGNhdGVnb3J5IChmb29kLCBnb29kcywgc2VydmljZXMsIGVuZXJneSkNCg0KYGBge3J9DQpkZl93ZWlnaHRzJGNhdGVnb3J5IDwtICJnb29kcyINCg0KDQpzdGFydF9mb29kIDwtIHdoaWNoKGRmX3dlaWdodHMkbmFtZSA9PSAiRm9vZCIpDQplbmRfZm9vZCA8LSB3aGljaChkZl93ZWlnaHRzJG5hbWUgPT0gIk90aGVyIGZvb2QgYXdheSBmcm9tIGhvbWUiKQ0KZGZfd2VpZ2h0cyRjYXRlZ29yeVtzZXEoc3RhcnRfZm9vZCwgZW5kX2Zvb2QpXSA8LSAiRm9vZCINCg0Kc3RhcnRfZW5lcmd5IDwtIHdoaWNoKGRmX3dlaWdodHMkbmFtZSA9PSAiRW5lcmd5IikNCmVuZF9lbmVyZ3kgPC0gd2hpY2goZGZfd2VpZ2h0cyRuYW1lID09ICJVdGlsaXR5IChwaXBlZCkgZ2FzIHNlcnZpY2UiKQ0KZGZfd2VpZ2h0cyRjYXRlZ29yeVtzZXEoc3RhcnRfZW5lcmd5LCBlbmRfZW5lcmd5KV0gPC0gIkVuZXJneSINCg0Kc3RhcnRfc2VydmljZXMgPC0gd2hpY2goZGZfd2VpZ2h0cyRuYW1lID09ICJTZXJ2aWNlcyBsZXNzIGVuZXJneSBzZXJ2aWNlcyIpDQplbmRfc2VydmljZXMgPC0gd2hpY2goZGZfd2VpZ2h0cyRuYW1lID09ICJGaW5hbmNpYWwgc2VydmljZXMiKQ0KZGZfd2VpZ2h0cyRjYXRlZ29yeVtzZXEoc3RhcnRfc2VydmljZXMsIGVuZF9zZXJ2aWNlcyldIDwtICJTZXJ2aWNlcyINCmBgYA0KDQojIyBDb21iaW5lIGludG8gb25lIGRhdGFzZXQNCg0KYGBge3J9DQoNCmBgYA0KDQoNCg==</div>
 
 
 

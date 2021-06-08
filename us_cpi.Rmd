@@ -5,3 +5,121 @@ date: "June 8, 2021"
 output: html_notebook
 ---
 
+Source: [BLS](https://download.bls.gov/pub/time.series/cu/)
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(readxl)
+library(lubridate)
+```
+
+
+# Data
+
+## Download CPI series
+
+[Link to bulk download of all series](https://download.bls.gov/pub/time.series/cu/cu.data.0.Current)
+Download all series and keep all observations after and including 2020M1
+
+```{r}
+raw_dat <- read.table("https://download.bls.gov/pub/time.series/cu/cu.data.0.Current", sep="\t", header=TRUE)
+
+df_series <- filter(raw_dat, year >= 2020)
+rm(raw_dat)
+```
+
+Convert month to numeric variables and keep only monthly observations (discarding semi-annual and annual CPI levels)
+
+```{r}
+df_series %>% 
+  separate(period, into = c("tmp", "month"), sep = 1) %>%
+  filter(tmp == "M") %>%
+  select(-tmp, -footnote_codes) %>%
+  mutate(month = as.numeric(month)) -> df_series
+```
+
+Split `series_id` into series code, filter `area` for **All city average** and `sa` for seasonally adjusted data **S**
+
+```{r}
+df_series %>%
+  separate(series_id, 
+           into = c("tmp", "sa", "tmp2", "area", "series"), 
+           sep = c(2,3,4,8)
+           ) %>%
+  filter(area == "0000",
+         sa == "S") %>%
+  mutate(series = str_trim(series)) %>%
+  select(-tmp, -tmp2, -area, -sa) -> df_series
+```
+
+## Download names of CPI series
+
+[Link to series names](https://download.bls.gov/pub/time.series/cu/cu.item)
+
+```{r}
+raw_names <- read.table(file = "https://download.bls.gov/pub/time.series/cu/cu.item", sep = "\t", header=T)
+
+df_names <- select(raw_names, item_code, item_name, display_level)
+
+rm(raw_names)
+```
+
+## Download weights of CPI series
+
+The corresponding weights of the CPI needed to be downloaded from the [Supplemental Files](https://www.bls.gov/cpi/tables/supplemental-files/home.htm). The link below needs to be adjusted with every new release! 
+
+```{r}
+url <- "https://www.bls.gov/cpi/tables/supplemental-files/news-release-table2-202104.xlsx"
+fn <- "cpi_weights.xlsx"
+download.file(url = url , destfile = fn, mode = "wb")
+raw_weights <- read_excel(path = fn)
+file.remove(fn)
+
+df_weights <- raw_weights[seq(6, nrow(raw_weights)), seq(1, 3)]
+```
+
+### Transformations
+
+- Change column names
+- remove single- and double-digit footnotes from `name`
+- convert weights to numeric, level to integer (and factor)
+- remove `NA`, blank lines
+
+```{r}
+names(df_weights) <- c("level", "name", "weight")
+df_weights %>%
+  mutate(level = factor(as.integer(level)),
+         weight = as.numeric(weight),
+         name = sapply(name, gsub, pattern = "\\(.\\)", replacement = ""),
+         name = sapply(name, gsub, pattern = "\\(..\\)", replacement = "")) %>%
+  filter(!is.na(weight)) -> df_weights
+```
+
+
+### Calculate category (food, goods, services, energy)
+
+```{r}
+df_weights$category <- "goods"
+
+
+start_food <- which(df_weights$name == "Food")
+end_food <- which(df_weights$name == "Other food away from home")
+df_weights$category[seq(start_food, end_food)] <- "Food"
+
+start_energy <- which(df_weights$name == "Energy")
+end_energy <- which(df_weights$name == "Utility (piped) gas service")
+df_weights$category[seq(start_energy, end_energy)] <- "Energy"
+
+start_services <- which(df_weights$name == "Services less energy services")
+end_services <- which(df_weights$name == "Financial services")
+df_weights$category[seq(start_services, end_services)] <- "Services"
+```
+
+## Combine into one dataset
+
+```{r}
+
+```
+
+
