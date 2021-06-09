@@ -1,18 +1,22 @@
 ---
 title: "Analyze disaggregated US CPI data"
 author: "Philipp Hauber"
-date: "June 8, 2021"
+date: "June 9, 2021"
 output: html_notebook
 ---
 
 Source: [BLS](https://download.bls.gov/pub/time.series/cu/)
 
 ```{r}
-library(dplyr)
+library(dplyr, warn.conflicts = FALSE)
 library(tidyr)
 library(readxl)
 library(stringr)
 library(lubridate)
+library(ggplot2)
+library(ggsci)
+
+options(dplyr.summarise.inform = FALSE) # turn off annoying summarise warning!
 ```
 
 
@@ -37,7 +41,9 @@ df_series %>%
   separate(period, into = c("tmp", "month"), sep = 1) %>%
   filter(tmp == "M") %>%
   select(-tmp, -footnote_codes) %>%
-  mutate(month = as.numeric(month)) -> df_series
+  mutate(month = as.numeric(month),
+         date = make_date(year = year, month = month)) %>%
+  select(-year, -month) -> df_series
 ```
 
 Split `series_id` into series code, filter `area` for **All city average** and `sa` for seasonally adjusted data **S**
@@ -63,7 +69,7 @@ raw_names <- read.table(file = "https://download.bls.gov/pub/time.series/cu/cu.i
 
 df_names <- select(raw_names, item_code, item_name, display_level)
 
-#rm(raw_names)
+rm(raw_names)
 ```
 
 ## Download weights of CPI series
@@ -186,11 +192,72 @@ df %>%
   group_by(series, category, level) %>%
   mutate(value_rebased = rebase_index(value, year, month, 2020, 2)) %>%
   ggplot(aes(x = date, y = value_rebased, group = series, color = category))+
-  geom_line(aes(linestyle = level))+
+  geom_line(aes(linetype = level))+
   geom_point()+
   scale_color_jco()
 ```
 
+
+## Plot contributions of categories to m/m change
+
+```{r}
+df_mm <- data.frame()
+
+yys <- c(2019:2021)
+mms <- c(1:12)
+
+for (yy in yys){
+  for (mm in mms){
+    
+    if (yy == 2021 & mm > 4)
+      break
+    end
+    
+    if (mm == 1){
+      yy_prev <- yy-1
+      mm_prev <- 12
+    } else {
+      yy_prev <- yy
+      mm_prev <- mm - 1
+    }
+      
+    df %>%
+      filter(name %in% c("All items", 
+                        "Energy", 
+                        "Food", "Commodities less food and energy commodities",
+                        "Services less energy services")
+             ) %>%
+      group_by(name, weight, category, level) %>%
+      summarise(mm_apr21 = round(growth_rate(value, 
+                                             year, 
+                                             month, 
+                                             yy_prev, mm_prev, 
+                                             yy, mm), 
+                             digits = 2)
+            ) %>%
+  mutate(date = make_date(year = yy, month = mm),
+         mm_apr21_weighted = mm_apr21 * weight / 100) %>% rbind(df_mm) -> df_mm
+  }
+}
+
+```
+
+```{r}
+df_mm %>% 
+  filter(name != "All items") %>%
+  mutate(date = make_date(year = year, month = month)) %>%
+  ggplot(mapping = aes(x = date, y = mm_apr21_weighted, group = name, fill = category),
+         data = filter(df_mm, name != "All items"))+
+  geom_col(position = 'stack')+
+  scale_fill_jco()+
+  geom_line(mapping = aes(x = date, y = mm_apr21),
+            data = filter(df_mm, name == "All items"), 
+            color = "black", show.legend = FALSE)+
+  geom_point(mapping = aes(x = date, y = mm_apr21),
+            data = filter(df_mm, name == "All items"), 
+            color = "black", show.legend = FALSE)
+  scale_color_jco()
+```
 
 ## Top movers in April 2021
 
@@ -208,6 +275,16 @@ df %>%
 
   df_plot
 ```
+
+Some entries are doubled, i.e. **Other lodging away from home including hotels and motesl** is just a subcomponent of **lodging away from home**. Similarly, **Air fares** is a subcomponent of **Public transportation**! Remove the supercategories:
+
+```{r}
+df_plot <- filter(df_plot, !(name %in% c("Public transportation", 
+                                          "Lodging away from home")
+                              )
+                   )
+```
+
 
 
 ### Plot
