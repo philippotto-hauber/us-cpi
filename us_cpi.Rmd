@@ -30,11 +30,10 @@ Download all series and keep all observations after and including 2020M1
 
 ```{r}
 raw_dat <- read.table("https://download.bls.gov/pub/time.series/cu/cu.data.0.Current", sep="\t", header=TRUE)
-
-df_series <- filter(raw_dat, year >= 2020)
-df_series_backup <- df_series
+df_series <- filter(raw_dat, year >= 2019)
 rm(raw_dat)
 ```
+
 
 Convert month to numeric variables and keep only monthly observations (discarding semi-annual and annual CPI levels)
 
@@ -57,7 +56,7 @@ df_series %>%
            sep = c(2,3,4,8)
            ) %>%
   filter(area == "0000",
-         sa == "U") %>%
+         sa == "S") %>%
   mutate(series = str_trim(series)) %>%
   select(-tmp, -tmp2, -area, -sa) %>%
   drop_na() -> df_series
@@ -73,8 +72,6 @@ raw_names <- read.table(file = "https://download.bls.gov/pub/time.series/cu/cu.i
 df_names <- select(raw_names, item_code, item_name, display_level)
 
 rm(raw_names)
-
-
 ```
 
 Merge names with series in `df`
@@ -82,9 +79,20 @@ Merge names with series in `df`
 ```{r}
 df <- merge(df_series, df_names, by.x = "series", by.y = "item_code")
 df <- rename(df, name = item_name)
+rm(df_names, df_series)
 ```
 
+Filter out those series for which there are missing observations, i.e. the total number of observations is not equal to the nummber of observations available for the headline index!
 
+```{r}
+n_obs_all_items <- sum(df$name == "All items")
+
+df %>% group_by(name) %>% summarise(n_obs = n()) %>% filter(n_obs == n_obs_all_items) -> list_keep
+
+df <- filter(df, name %in% list_keep$name)
+
+rm(list_keep)
+```
 
 ## Download weights of CPI series
 
@@ -130,6 +138,8 @@ raw_weights %>%
   mutate(year = "2020") %>% 
   rename(weight_Dec = weight) %>%
   select(-level)-> df_weights_Dec
+
+rm(raw_weights, fn, url)
 ```
 
 ### Weights for December 2019
@@ -149,6 +159,8 @@ raw_weights %>%
   rename(weight_Dec = weight) %>%
   select(-level) %>%
   rbind(df_weights_Dec) -> df_weights_Dec
+
+rm(raw_weights, fn, url)
 ```
 
 
@@ -163,41 +175,60 @@ df_weights <- data.frame()
 # function to calculate ratio of index
 ratio_of_index <- function(value, date, date1, date2)
   return(value[which(date == date2)] / value[which(date == date1)])
-dates <- seq(min(df$date), max(df$date), by = "month")
+dates <- seq(as_date("2019-12-01"), as_date("2021-04-01"), by = "month") # calculate the weights for Jan20-May21!
 for (ind_d in seq(1, length(dates)))
 {
   d <- dates[ind_d]
-  d_base <- make_date(year = year(d) - 1, month = 12)
-  
-  df_tmp <- merge(df, filter(df_weights_Dec, year == year(d_base)), by = "name")
-  
-  df_tmp %>%
-    filter(name == "All items") %>%
-    summarise(change_all = ratio_of_index(value, date, d_base, d)) %>% 
-    select(change_all) -> change_all
-  
-  df_tmp %>%
-    filter(name != "All items") %>% 
-    group_by(name, weight_Dec) %>%
-    summarise(change_series = ratio_of_index(value, date, d_base, d)) %>%
-    mutate(new_weight = change_series * weight_Dec,
-           new_weight_normalized = new_weight / change_all[1,1]) %>% 
-    ungroup() %>%
-    select(name, weight = new_weight_normalized) %>%
-    mutate(date = d + months(1)) %>%
-    rbind(df_weights) -> df_weights
-  
-  # add All items which was filtered out above
-  df_weights <- rbind(df_weights, data.frame(name = "All items", weight = 100, date = d + months(1)))
+  if (month(d) == 12) # no need to calculate weights for December!
+          df_weights_Dec %>% 
+            filter(year == year(d)) %>% 
+            select(-year, weight = weight_Dec) %>% 
+            mutate(date = d + months(1)) %>%
+            rbind(df_weights) -> df_weights
+  else
+  {
+          d_base <- make_date(year = year(d) - 1, month = 12)
+          
+          df_tmp <- merge(df, filter(df_weights_Dec, year == year(d_base)), by = "name")
+          
+          df_tmp %>%
+            filter(name == "All items") %>%
+            summarise(change_all = ratio_of_index(value, date, d_base, d)) %>% 
+            select(change_all) -> change_all
+          
+          df_tmp %>%
+            filter(name != "All items") %>% 
+            group_by(name, weight_Dec) %>%
+            summarise(change_series = ratio_of_index(value, date, d_base, d)) %>%
+            mutate(new_weight = change_series * weight_Dec,
+                   new_weight_normalized = new_weight / change_all[1,1]) %>% 
+            ungroup() %>%
+            select(name, weight = new_weight_normalized) %>%
+            mutate(date = d + months(1)) %>%
+            rbind(df_weights) -> df_weights
+          
+          # add All items which was filtered out above
+          df_weights <- rbind(df_weights, data.frame(name = "All items", weight = 100.0, date = d + months(1)))
+  }
 }
+
+rm(df_tmp, df_weights_Dec, change_all, d, d_base, ind_d, dates)
 ```
 
 
 Merge with `df`
 
 ```{r}
-df <- merge(df, df_weights, by = c("name", "date"))
+#df <- merge(df, df_weights, by = c("name", "date"))
+#(df_weights)
 ```
+
+Alternative merge with `left_join`
+
+```{r}
+df <- left_join(df, df_weights, by = c("name", "date"))
+```
+
 
 
 ## Download categories and levels (food, goods, services, energy)
@@ -230,6 +261,8 @@ df_categories$category[seq(start_services, end_services)] <- "Services"
 
 df_categories$category[df_categories$name == "All items"] <- "Total"
 df_categories$category[df_categories$name == "All items less food and energy"] <- "Total ex energy and food"
+
+rm(raw_table2_apr2021, end_energy, end_food, end_services, start_energy, start_food, start_services, fn, url)
 ```
 
 
@@ -240,6 +273,7 @@ Merge with `df` and reorder columns
 ```{r}
 df <- merge(df, df_categories, by = "name")
 df <- select(df, date, series, name, value, weight, category, level)
+rm(df_categories)
 ```
 
 # Analysis
@@ -257,6 +291,10 @@ growth_rate <- function(x, dates, date1, date2)
 }
 ```
 
+
+
+
+
 ```{r}
 rebase_index <- function(x, dates, date0)
 # rebase index to 100 in y0m0
@@ -273,16 +311,12 @@ rebase_index <- function(x, dates, date0)
 ```{r}
 df %>% 
     filter(level == 3) %>%
-  group_by(name, weight, category) %>%
-  summarise(mm_apr21 = round(growth_rate(value, date, as_date("2021-03-01"), as_date("2021-04-01")), digits = 2)
-            ) %>%
-  mutate(mm_apr21_weighted = mm_apr21 * weight / 100) %>%
-  pivot_longer(cols = c("mm_apr21", "mm_apr21_weighted"), names_to = "variable", values_to = "value") -> df_plot
-
-ggplot(df_plot)+
-  geom_histogram(aes(x = value), bins = 100, fill = "steelblue")+
-  facet_wrap(~variable, nrow = 2, scales = "free_x")
-
+  group_by(name, category) %>%
+  summarise(mm_apr21 = growth_rate(value, date, as_date("2021-03-01"), as_date("2021-04-01")),
+            mm_may21 = growth_rate(value, date, as_date("2021-04-01"), as_date("2021-05-01")),
+            )  %>%
+  ggplot()+
+  geom_histogram(aes(x = mm_may21), bins = 100, fill = "steelblue")
 ```
 
 
@@ -304,16 +338,16 @@ df %>%
 ```{r}
 df_mm <- data.frame()
 
-yys <- c(2019:2021)
+yys <- c(2020:2021)
 mms <- c(1:12)
 
 for (yy in yys){
   for (mm in mms){
-            if (yy == 2021 && mm > 4)
+            if (yy == 2021 && mm > 5)
                break
             
-            if (yy == 2019 && mm == 1)
-              next
+            #if (yy == 2020 && mm == 1)
+            #  next
 
               
             if (mm == 1){
@@ -330,17 +364,18 @@ for (yy in yys){
                                 "Food", "Commodities less food and energy commodities",
                                 "Services less energy services")
                      ) %>%
-              group_by(name, weight, category, level) %>%
-              summarise(mm_apr21 = round(growth_rate(value, 
-                                                     date,
-                                                     make_date(year = yy_prev, month = mm_prev), 
-                                                     make_date(year = yy, month = mm)
-                                                     ), 
-                                          digits = 2)
-                        ) %>%
-              mutate(mm_apr21_weighted = mm_apr21 * weight / 100) -> tmp 
-            
-              df_mm <- rbind(df_mm, tmp)
+              group_by(name) %>%
+              mutate(mm_growth = growth_rate(value, 
+                                             date,
+                                             make_date(year = yy_prev, month = mm_prev), 
+                                             make_date(year = yy, month = mm)
+                                             ), 
+                     ) %>%
+              filter(date == make_date(year = yy, month = mm)) %>%
+              select(date, name, mm_growth, weight, category) %>%
+              mutate(mm_growth_weighted = mm_growth * weight / 100) %>%
+              ungroup() %>%
+              rbind(df_mm) -> df_mm
   }
 }
 
@@ -349,80 +384,139 @@ for (yy in yys){
 ```{r}
 df_mm %>% 
   filter(name != "All items") %>%
-  mutate(date = make_date(year = year, month = month)) %>%
-  ggplot(mapping = aes(x = date, y = mm_apr21_weighted, group = name, fill = category),
+  ggplot(mapping = aes(x = date, y = mm_growth_weighted, group = name, fill = category),
          data = filter(df_mm, name != "All items"))+
   geom_col(position = 'stack')+
   scale_fill_jco()+
-  geom_line(mapping = aes(x = date, y = mm_apr21),
+  geom_line(mapping = aes(x = date, y = mm_growth),
             data = filter(df_mm, name == "All items"), 
             color = "black", show.legend = FALSE)+
-  geom_point(mapping = aes(x = date, y = mm_apr21),
+  geom_point(mapping = aes(x = date, y = mm_growth),
             data = filter(df_mm, name == "All items"), 
             color = "black", show.legend = FALSE)
-  scale_color_jco()
 ```
 
-## Top movers in April 2021
+Compare sum of weighted components with headline m/m growth
 
 ```{r}
-df %>% 
-  filter(level %in% c(4, 5, 6, 7, 8), !(category %in% c("Energy", "Food"))) %>%
-  group_by(name, weight, category) %>%
-  summarise(
-            diff_apr21 = round(growth_rate(value, date, "2020-02-01", "2021-04-01"), digits = 2),
-            mm_apr21 = round(growth_rate(value, date, "2021-03-01", "2021-04-01"), digits = 2)
-            ) %>%
-  arrange(desc(mm_apr21)) %>%
-  select(name, mm_apr21, diff_apr21, weight, category) %>%
-  head(20) -> df_plot
-
-  df_plot
+df_mm %>% filter(name != "All items") %>% group_by(date) %>% summarise(sum_components = sum(mm_growth_weighted)) %>% select(date, sum_components) %>% merge(filter(df_mm, name == "All items"), by = "date") %>% select(sum_components, mm_growth) %>% round(digits = 2)
 ```
 
-Some entries are doubled, i.e. **Other lodging away from home including hotels and motesl** is just a subcomponent of **lodging away from home**. Similarly, **Air fares** is a subcomponent of **Public transportation**! Remove the supercategories:
+## Top movers in April and May 2021
 
 ```{r}
-df_plot <- filter(df_plot, !(name %in% c("Public transportation", 
-                                          "Lodging away from home")
-                              )
-                   )
+get_mm_growth_rate <- function(df, date_mm)
+# find the n series with the largest m/m change
+{
+  df %>% 
+    group_by(name) %>%
+    summarise(mm_rate = growth_rate(value, 
+                                    date, 
+                                    date_mm - months(1), 
+                                    date_mm)) %>%
+    mutate(date = date_mm) -> df_tmp
+    
+  
+  # add weights back
+  df_out <- merge(df_tmp, 
+                  select(df, name, date, weight,category), 
+                  by = c("name", "date"))
+  
+  # calculate weighted growth
+  df_out %>% mutate(mm_rate_weighted = mm_rate * weight/100) %>%
+    arrange(mm_rate_weighted) -> df_out
+}
+```
+
+April 2021
+```{r}
+
+df_apr21 <- get_mm_growth_rate(filter(df, level %in% c(4, 5, 6, 7, 8), 
+                                          !(category %in% c("Energy", "Food"))),
+                              date_mm = as_date("2021-04-01"))
+
+df_apr21 %>% select(name, mm_rate, mm_rate_weighted)
+```
+
+May 2021
+```{r}
+
+df_may21 <- top_movers(filter(df, level %in% c(4, 5, 6, 7, 8), 
+                              !(category %in% c("Energy", "Food"))),
+                       date_mm = as_date("2021-05-01"), 
+                       n = 20)
+
+df_may21
 ```
 
 
+
+```{r}
+df %>%
+  group_by(name, category) %>%
+  summarise(value_mm = growth_rate(value, date, "2021-04-01", "2021-05-01")) %>%
+  mutate(date = as_date("2021-05-01")) %>%
+  select(name, date, value_mm, category)-> tmp
+
+df %>%
+  group_by(name, category) %>%
+  summarise(value_mm = growth_rate(value, date, "2021-03-01", "2021-04-01")) %>%
+  mutate(date = as_date("2021-04-01")) %>%
+  select(name, date, value_mm, category) %>% rbind(tmp) -> tmp
+
+tmp2 <- merge(tmp, select(df, name, date, weight), by = c("name", "date"))
+
+df %>%
+  group_by(name, category) %>%
+  summarise(diff_pandemic = growth_rate(value, date, "2020-02-01", "2021-03-01")) %>%
+  select(name, diff_pandemic)-> tmp
+
+tmp3 <- merge(tmp2, tmp, by = "name")
+
+tmp3$date_str <- "May 21"
+tmp3$date_str[tmp3$date == as_date("2021-04-01")] <- "Apr 21"
+  
+```
 
 ### Plot
 
 ```{r}
-ggplot(df_plot, aes(x = diff_apr21, y = mm_apr21))+
-  geom_point(aes(color = category, size = weight))+
+tmp3 %>% 
+  filter(name %in% c("Car and truck rental", 
+                     "Airline fares", 
+                     "Used cars and trucks",
+                     "New vehicles",
+                     "Admissions",
+                     "Other lodging away from home including hotels and motels")) -> df_plot 
+
+df_plot$name <- ifelse(df_plot$name == "Other lodging away from home including hotels and motels", "Hotels and motels", df_plot$name)
+
+df_plot %>% group_by(name, diff_pandemic) %>% 
+  summarise(y_coord = mean(value_mm)) %>%
+  select(name, x_coord = diff_pandemic, y_coord) -> df_text
+
+df_plot %>%
+ggplot(aes(x = diff_pandemic, y = value_mm))+
+  geom_point(aes(color = date_str, size = weight))+
   scale_color_jco()+
   ylim(c(0, 18))+
   scale_size(breaks = c(0.1, 0.5, 2), labels = c("0.1%", "0.5%", "2%"))+
   labs(title = "Vereinigte Staaten: Verbraucherpreisindex",
-       subtitle = "20 Waren und Dienstleistungen (ohne Energie und Lebensmittel) mit der höchsten Monatsrate im April 2021",
+       subtitle = "Ausgewählte Waren und Dienstleistungen, Veränderung ggü. Vormonat im April und Mai 2021",
        caption = "Quelle: Bureau of Labor Statistics, eigene Berechnungen.",
-       y="Veränderung April 2021 ggü. März 2021",
-       x = "Veränderung April 2021 ggü. Februar 2020")+
+       y="Veränderung ggü. Vormonat",
+       x = "Veränderung März 2021 ggü. Februar 2020")+
   geom_vline(xintercept = 0)+
-  geom_text(mapping = aes(x = diff_apr21, y = mm_apr21, label = name), 
-            data = filter(df_plot, name %in% c("Car and truck rental", 
-                                               "Airline fares", 
-                                               "Used cars and trucks",
-                                               "Other lodging away from home including hotels and motels",
-                                               "Lodging away from home",
-                                               "Public transportation")
-                          ),
+  geom_text(mapping = aes(x = x_coord, y = y_coord, label = name), 
+            data = df_text,
             size = 4,
             nudge_x = 0.4,
             nudge_y = 0.4)
+  
 ```
 
 
 ```{r}
 ggsave(filename = "plot_cpi_US.pdf", width = 12, height = 6, units = "in")
 ```
-
-
-
 
