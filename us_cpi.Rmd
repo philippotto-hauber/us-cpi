@@ -12,6 +12,7 @@ rm(list = ls())
 library(dplyr, warn.conflicts = FALSE)
 library(tidyr)
 library(readxl)
+library(openxlsx)
 library(stringr)
 library(lubridate)
 library(ggplot2)
@@ -47,20 +48,37 @@ df_series %>%
   select(-year, -month) -> df_series
 ```
 
-Split `series_id` into series code, filter `area` for **All city average** and `sa` for unadjusted data **U**
+Split `series_id` into series code, filter `area` for **All city average** and `sa` for seasonally adjusted data **S**
 
 ```{r}
 df_series %>%
   separate(series_id, 
-           into = c("tmp", "sa", "tmp2", "area", "series"), 
+           into = c("tmp", "sa", "periodicity", "area", "series"), 
            sep = c(2,3,4,8)
            ) %>%
   filter(area == "0000",
-         sa == "S") %>%
+         periodicity == "R") %>%
   mutate(series = str_trim(series)) %>%
-  select(-tmp, -tmp2, -area, -sa) %>%
+  select(-tmp, -area) %>%
   drop_na() -> df_series
 ```
+
+Filter for seasonally adjusted data - **S** - except personal care products (SEGB) where only unadjusted data - **U** - are available
+
+```{r}
+ind_keep <- df_series$sa == "S"
+ind_keep[df_series$series == "SEGB"] <- TRUE
+df_series <- df_series[ind_keep, ]
+
+rm(ind_keep)
+```
+
+Remove some columns and reorder the rest
+
+```{r}
+df_series <- select(df_series, date, series, value)
+```
+
 
 ## Download names of CPI series
 
@@ -80,6 +98,8 @@ Merge names with series in `df`
 df <- merge(df_series, df_names, by.x = "series", by.y = "item_code")
 df <- rename(df, name = item_name)
 rm(df_names, df_series)
+
+filter(df, name == "Personal care products")
 ```
 
 Filter out those series for which there are missing observations, i.e. the total number of observations is not equal to the nummber of observations available for the headline index!
@@ -144,7 +164,7 @@ rm(raw_weights, fn, url)
 
 ### Weights for December 2019
 
-The relative importance of the different items for December 2020 can be found in the Supplemental Tables of the January 2021 release
+The relative importance of the different items for December 2019 can be found in the Supplemental Tables of the January 2020 release
 
 ```{r}
 url <- "https://www.bls.gov/cpi/tables/supplemental-files/news-release-table2-202001.xlsx"
@@ -162,7 +182,33 @@ raw_weights %>%
 
 rm(raw_weights, fn, url)
 ```
+### Weights for December 2012-2018
 
+The relative importance of the different items for December 2012-2019 can be found in the Supplemental Tables of the January release of the following year(e.g. 2019 for 2018). Note, however, that the files for 2019 and earlier have been archived and need to be downloaded and unzipped first!
+
+```{r}
+for (year_weights in c(2017:2018))
+{
+url <- paste0("https://www.bls.gov/cpi/tables/supplemental-files/archive-", year_weights+1, ".zip")
+download.file(url = url, destfile = paste0("tmp", year_weights+1, ".zip"))
+list_dir_old <- list.dirs()
+unzip(paste0("tmp", year_weights+1, ".zip"))
+dir_in <- setdiff(list.dirs(), list_dir_old)
+raw_weights <- read.xlsx(paste0(dir_in, "/news-release-table2-", year_weights+1, "01.xlsx"))
+
+file.remove(paste0("tmp", year_weights+1, ".zip"))
+unlink(paste0("archive-", year_weights+1), recursive = T, force = T)
+
+raw_weights %>% 
+  transform_raw_weights() %>% 
+  mutate(year = !!year_weights) %>% 
+  rename(weight_Dec = weight) %>%
+  select(-level) %>%
+  rbind(df_weights_Dec) -> df_weights_Dec
+
+rm(raw_weights, url)
+}
+```
 
 ### Calculate weights for all months and series
 
@@ -216,19 +262,11 @@ rm(df_tmp, df_weights_Dec, change_all, d, d_base, ind_d, dates)
 ```
 
 
-Merge with `df`
-
-```{r}
-#df <- merge(df, df_weights, by = c("name", "date"))
-#(df_weights)
-```
-
-Alternative merge with `left_join`
+Merge with `left_join()` (this keeps the observations for which we have no weights)
 
 ```{r}
 df <- left_join(df, df_weights, by = c("name", "date"))
 ```
-
 
 
 ## Download categories and levels (food, goods, services, energy)
@@ -264,8 +302,6 @@ df_categories$category[df_categories$name == "All items less food and energy"] <
 
 rm(raw_table2_apr2021, end_energy, end_food, end_services, start_energy, start_food, start_services, fn, url)
 ```
-
-
 The `level` from the Supplemental Table does not match with `display_level` from the raw series. However, as I am unsure what the latter actually refers to, I discard it. 
 
 Merge with `df` and reorder columns
@@ -292,9 +328,6 @@ growth_rate <- function(x, dates, date1, date2)
 ```
 
 
-
-
-
 ```{r}
 rebase_index <- function(x, dates, date0)
 # rebase index to 100 in y0m0
@@ -304,8 +337,141 @@ rebase_index <- function(x, dates, date0)
 }
 ```
 
+## Plot CPI index
 
-## Distribution of m/m changes in April 2021
+Index for different components
+
+- Food
+- Energy
+- Services (ex energy)
+- Durables
+- Non-durables (ex food and energy)
+
+### Construct durables and non-durables ex energy and food
+
+#### Non-durables
+
+```{r}
+list_ndurables <- c("Apparel", 
+                   "Window and floor coverings and other linens",
+                   "Housekeeping supplies",
+                   "Medical care commodities",
+                   "Audio discs, tapes and other media",
+                   "Unsampled video and audio",
+                   "Pets and pet products", 
+                   "Photographic equipment and supplies",
+                   "Recreational reading materials",
+                   "Other recreational goods",
+                   "Educational books and supplies",
+                   "Tobacco and smoking products",
+                   "Personal care products",
+                   "Miscellaneous personal goods")
+```
+
+Which of these items are not in the data? 
+
+```{r}
+tmp <- filter(df, name %in% list_ndurables)
+setdiff(list_ndurables, tmp$name)
+rm(tmp)
+```
+
+
+```{r}
+df %>%
+  filter(name %in% list_ndurables) %>%
+  group_by(date) %>% 
+  mutate(sum_weights = sum(weight)) %>%
+  group_by(name) %>%
+  mutate(value_rebased = rebase_index(value, date, "2020-02-01")) %>%
+  ungroup() %>%
+  mutate(weights_normalized = weight/sum_weights) %>%
+  group_by(date, sum_weights) %>%
+  summarise(index = sum(value_rebased * weights_normalized)) %>%
+  mutate(group = "Non-durables",
+         weight = sum_weights) -> df_ndurables
+```
+
+#### Durables
+
+Items belonging to **durables** according to correspondence with BLS
+
+```{r}
+list_durables <- c("Furniture and bedding",
+                   "Appliances",
+                   "Other household equipment and furnishings",
+                   "Tools, hardware, outdoor equipment and supplies",
+                   "New vehicles",
+                   "Used cars and trucks",
+                   "Unsampled new and used motor vehicles",
+                   "Motor vehicle parts and equipment",
+                   "Televisions",
+                   "Other video equipment",
+                   "Audio equipment",
+                   "Sporting goods",
+                   "Information technology commodities")
+```
+
+Which of these items are not in the data? 
+
+```{r}
+tmp <- filter(df, name %in% list_durables)
+setdiff(list_durables, tmp$name)
+rm(tmp)
+```
+
+```{r}
+df %>%
+  filter(name %in% list_durables) %>%
+  group_by(date) %>% 
+  mutate(sum_weights = sum(weight)) %>%
+  group_by(name) %>%
+  mutate(value_rebased = rebase_index(value, date, "2020-02-01")) %>%
+  ungroup() %>%
+  mutate(weights_normalized = weight/sum_weights) %>%
+  group_by(date, sum_weights) %>%
+  summarise(index = sum(value_rebased * weights_normalized)) %>%
+  mutate(group = "Durables",
+         weight = sum_weights) -> df_durables
+```
+
+#### Energy, food and services ex energy 
+
+```{r}
+df %>% 
+  filter(name %in% c("Services less energy services",
+                     "Food",
+                     "Energy")
+         )%>%
+  rename(group = name) %>%
+  group_by(group) %>%
+  mutate(index = rebase_index(value, date, "2020-02-01")) -> df_others
+           
+```
+
+### Merge dataframes and plot
+
+```{r}
+df_plot <- rbind(df_others, rbind(df_durables, df_ndurables))
+```
+
+Check coverage (should be close to 100!)
+```{r}
+df_plot %>% 
+  group_by(date) %>% 
+  summarise(sum_weight = sum(weight))
+```
+
+Plot series
+
+```{r}
+df_plot %>% 
+  ggplot(aes(x = date, y = index, color = group, group = group))+
+  geom_line()+
+  scale_color_jco()
+```
+
+## Distribution of m/m changes in April and May 2021
 
 
 ```{r}
@@ -331,7 +497,6 @@ df %>%
   geom_point()+
   scale_color_jco()
 ```
-
 
 ## Plot contributions of categories to m/m change
 
@@ -396,59 +561,15 @@ df_mm %>%
             color = "black", show.legend = FALSE)
 ```
 
-Compare sum of weighted components with headline m/m growth
+### Compare sum of weighted components with headline m/m growth
 
 ```{r}
 df_mm %>% filter(name != "All items") %>% group_by(date) %>% summarise(sum_components = sum(mm_growth_weighted)) %>% select(date, sum_components) %>% merge(filter(df_mm, name == "All items"), by = "date") %>% select(sum_components, mm_growth) %>% round(digits = 2)
 ```
 
-## Top movers in April and May 2021
+Only small deviations in the second decimal!
 
-```{r}
-get_mm_growth_rate <- function(df, date_mm)
-# find the n series with the largest m/m change
-{
-  df %>% 
-    group_by(name) %>%
-    summarise(mm_rate = growth_rate(value, 
-                                    date, 
-                                    date_mm - months(1), 
-                                    date_mm)) %>%
-    mutate(date = date_mm) -> df_tmp
-    
-  
-  # add weights back
-  df_out <- merge(df_tmp, 
-                  select(df, name, date, weight,category), 
-                  by = c("name", "date"))
-  
-  # calculate weighted growth
-  df_out %>% mutate(mm_rate_weighted = mm_rate * weight/100) %>%
-    arrange(mm_rate_weighted) -> df_out
-}
-```
-
-April 2021
-```{r}
-
-df_apr21 <- get_mm_growth_rate(filter(df, level %in% c(4, 5, 6, 7, 8), 
-                                          !(category %in% c("Energy", "Food"))),
-                              date_mm = as_date("2021-04-01"))
-
-df_apr21 %>% select(name, mm_rate, mm_rate_weighted)
-```
-
-May 2021
-```{r}
-
-df_may21 <- top_movers(filter(df, level %in% c(4, 5, 6, 7, 8), 
-                              !(category %in% c("Energy", "Food"))),
-                       date_mm = as_date("2021-05-01"), 
-                       n = 20)
-
-df_may21
-```
-
+## m/m changes in April and May 2021 vs. differences to pre-pandemic level for selected goods and services
 
 
 ```{r}
