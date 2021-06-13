@@ -197,7 +197,7 @@ dir_in <- setdiff(list.dirs(), list_dir_old)
 raw_weights <- read.xlsx(paste0(dir_in, "/news-release-table2-", year_weights+1, "01.xlsx"))
 
 file.remove(paste0("tmp", year_weights+1, ".zip"))
-unlink(paste0("archive-", year_weights+1), recursive = T, force = T)
+unlink(dir_in, recursive = T, force = T)
 
 raw_weights %>% 
   transform_raw_weights() %>% 
