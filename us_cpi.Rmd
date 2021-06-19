@@ -31,7 +31,7 @@ Download all series and keep all observations after and including 2020M1
 
 ```{r}
 raw_dat <- read.table("https://download.bls.gov/pub/time.series/cu/cu.data.0.Current", sep="\t", header=TRUE)
-df_series <- filter(raw_dat, year >= 2019)
+df_series <- filter(raw_dat, year >= 2012)
 rm(raw_dat)
 ```
 
@@ -128,7 +128,8 @@ Define a function to transform the raw, downloaded weights and
 ```{r}
 transform_raw_weights <- function(raw_data)
 {
-  df <- raw_data[seq(6, nrow(raw_data)), seq(1, 3)]
+  ind_start <- grep("All items", raw_data[, 2])[1]
+  df <- raw_data[seq(ind_start, nrow(raw_data)), seq(1, 3)]
   
   names(df) <- c("level", "name", "weight")
   df %>%
@@ -187,14 +188,22 @@ rm(raw_weights, fn, url)
 The relative importance of the different items for December 2012-2019 can be found in the Supplemental Tables of the January release of the following year(e.g. 2019 for 2018). Note, however, that the files for 2019 and earlier have been archived and need to be downloaded and unzipped first!
 
 ```{r}
-for (year_weights in c(2017:2018))
+for (year_weights in c(2012:2018))
 {
 url <- paste0("https://www.bls.gov/cpi/tables/supplemental-files/archive-", year_weights+1, ".zip")
 download.file(url = url, destfile = paste0("tmp", year_weights+1, ".zip"))
 list_dir_old <- list.dirs()
 unzip(paste0("tmp", year_weights+1, ".zip"))
 dir_in <- setdiff(list.dirs(), list_dir_old)
-raw_weights <- read.xlsx(paste0(dir_in, "/news-release-table2-", year_weights+1, "01.xlsx"))
+if (year_weights + 1 >= 2017)
+  raw_weights <- read.xlsx(paste0(dir_in, "/news-release-table2-", year_weights+1, "01.xlsx"))
+else
+{
+  if (file.exists(paste0(dir_in, "/CpiPress2_FINAL_", year_weights+1, "01.xlsx"))) # try xlsx
+    raw_weights <- read.xlsx(paste0(dir_in, "/CpiPress2_FINAL_", year_weights+1, "01.xlsx"))
+  else
+    raw_weights <- read_excel(paste0(dir_in, "/CpiPress2_FINAL_", year_weights+1, "01.xls"))
+}
 
 file.remove(paste0("tmp", year_weights+1, ".zip"))
 unlink(dir_in, recursive = T, force = T)
@@ -205,9 +214,9 @@ raw_weights %>%
   rename(weight_Dec = weight) %>%
   select(-level) %>%
   rbind(df_weights_Dec) -> df_weights_Dec
-
-rm(raw_weights, url)
 }
+
+#rm(raw_weights, url)
 ```
 
 ### Calculate weights for all months and series
@@ -221,7 +230,7 @@ df_weights <- data.frame()
 # function to calculate ratio of index
 ratio_of_index <- function(value, date, date1, date2)
   return(value[which(date == date2)] / value[which(date == date1)])
-dates <- seq(as_date("2019-12-01"), as_date("2021-04-01"), by = "month") # calculate the weights for Jan20-May21!
+dates <- seq(as_date("2012-12-01"), as_date("2021-04-01"), by = "month") # calculate the weights for Jan12-May21!
 for (ind_d in seq(1, length(dates)))
 {
   d <- dates[ind_d]
@@ -258,7 +267,8 @@ for (ind_d in seq(1, length(dates)))
   }
 }
 
-rm(df_tmp, df_weights_Dec, change_all, d, d_base, ind_d, dates)
+#rm(df_tmp, df_weights_Dec, change_all, d, d_base, ind_d, dates)
+rm(df_tmp,  change_all, d, d_base, ind_d, dates)
 ```
 
 
@@ -307,7 +317,7 @@ The `level` from the Supplemental Table does not match with `display_level` from
 Merge with `df` and reorder columns
 
 ```{r}
-df <- merge(df, df_categories, by = "name")
+df <- left_join(df, df_categories, by = "name")
 df <- select(df, date, series, name, value, weight, category, level)
 rm(df_categories)
 ```
@@ -347,7 +357,7 @@ Index for different components
 - Durables
 - Non-durables (ex food and energy)
 
-### Construct durables and non-durables ex energy and food
+### Construct non-durables ex energy and food
 
 #### Non-durables
 
@@ -435,13 +445,15 @@ df %>%
          weight = sum_weights) -> df_durables
 ```
 
-#### Energy, food and services ex energy 
+#### Durables, energy, food and services ex energy 
 
 ```{r}
 df %>% 
   filter(name %in% c("Services less energy services",
-                     "Food",
-                     "Energy")
+                     "Food at home",
+                     "Food away from home",
+                     "Energy",
+                     "Durables")
          )%>%
   rename(group = name) %>%
   group_by(group) %>%
@@ -452,12 +464,13 @@ df %>%
 ### Merge dataframes and plot
 
 ```{r}
-df_plot <- rbind(df_others, rbind(df_durables, df_ndurables))
+#df_groups <- rbind(df_others, rbind(df_durables, df_ndurables))
+df_groups <- rbind(df_others, df_ndurables)
 ```
 
 Check coverage (should be close to 100!)
 ```{r}
-df_plot %>% 
+df_groups %>% 
   group_by(date) %>% 
   summarise(sum_weight = sum(weight))
 ```
@@ -465,106 +478,108 @@ df_plot %>%
 Plot series
 
 ```{r}
-df_plot %>% 
+df_groups %>% 
+  filter(date >= "2016-01-01") %>%
   ggplot(aes(x = date, y = index, color = group, group = group))+
   geom_line()+
-  scale_color_jco()
+  scale_color_jco()+
+  labs(x = "", y = "Index, Feb 2020 = 100",
+       title = "USA:Verbraucherpreisindex",
+       caption = "Quelle: Bureau of Labor Statistics, eigene Berechnungen.")+
+  theme(legend.title = element_blank(),
+        legend.position = "top")
 ```
-
-## Distribution of m/m changes in April and May 2021
 
 
 ```{r}
-df %>% 
-    filter(level == 3) %>%
-  group_by(name, category) %>%
-  summarise(mm_apr21 = growth_rate(value, date, as_date("2021-03-01"), as_date("2021-04-01")),
-            mm_may21 = growth_rate(value, date, as_date("2021-04-01"), as_date("2021-05-01")),
-            )  %>%
-  ggplot()+
-  geom_histogram(aes(x = mm_may21), bins = 100, fill = "steelblue")
+#ggsave(filename = "plot_cpi_US_20162021.pdf", width = 12, height = 6, units = "in")
 ```
 
-
-## Plot all time series
+### Export to csv
 
 ```{r}
-df %>% 
-  group_by(series, category, level) %>%
-  mutate(value_rebased = rebase_index(value, date, "2020-02-01")) %>%
-  ggplot(aes(x = date, y = value_rebased, group = series, color = category))+
-  geom_line(aes(linetype = level))+
-  geom_point()+
-  scale_color_jco()
+df_groups %>% 
+  filter(date >= "2016-01-01") %>%
+  select(date, group, index) %>%
+  pivot_wider(names_from = "group", values_from = "index") %>%
+  write.xlsx(file = "data_cpi.xlsx", sheetName = "Sheet1", 
+  col.names = TRUE, row.names = TRUE, append = FALSE)
 ```
+
 
 ## Plot contributions of categories to m/m change
 
+This part of the analysis does not work while there are no weights for durables.  In any vase, as I cannot replicate the exact weights and subcomponents non-durables ex energy, the m/m rates might be off by a bit. Therefore, it seems more reasonable to focus less on the details of monthly changes and use the index to convey the main message. 
+
 ```{r}
-df_mm <- data.frame()
-
-yys <- c(2020:2021)
-mms <- c(1:12)
-
-for (yy in yys){
-  for (mm in mms){
-            if (yy == 2021 && mm > 5)
-               break
-            
-            #if (yy == 2020 && mm == 1)
-            #  next
-
-              
-            if (mm == 1){
-              yy_prev <- yy-1
-              mm_prev <- 12
-            } else {
-              yy_prev <- yy
-              mm_prev <- mm - 1
-            }
-              
-            df %>%
-              filter(name %in% c("All items", 
-                                "Energy", 
-                                "Food", "Commodities less food and energy commodities",
-                                "Services less energy services")
-                     ) %>%
-              group_by(name) %>%
-              mutate(mm_growth = growth_rate(value, 
-                                             date,
-                                             make_date(year = yy_prev, month = mm_prev), 
-                                             make_date(year = yy, month = mm)
-                                             ), 
-                     ) %>%
-              filter(date == make_date(year = yy, month = mm)) %>%
-              select(date, name, mm_growth, weight, category) %>%
-              mutate(mm_growth_weighted = mm_growth * weight / 100) %>%
-              ungroup() %>%
-              rbind(df_mm) -> df_mm
-  }
-}
+# df_mm <- data.frame()
+# 
+# yys <- c(2020:2021)
+# mms <- c(1:12)
+# 
+# for (yy in yys){
+#   for (mm in mms){
+#             if (yy == 2021 && mm > 5)
+#                break
+#             
+#             #if (yy == 2020 && mm == 1)
+#             #  next
+# 
+#               
+#             if (mm == 1){
+#               yy_prev <- yy-1
+#               mm_prev <- 12
+#             } else {
+#               yy_prev <- yy
+#               mm_prev <- mm - 1
+#             }
+#               
+#             df_groups %>%
+#               group_by(group) %>%
+#               mutate(mm_growth = growth_rate(index, 
+#                                              date,
+#                                              make_date(year = yy_prev, month = mm_prev), 
+#                                              make_date(year = yy, month = mm)
+#                                              ), 
+#                      ) %>%
+#               filter(date == make_date(year = yy, month = mm)) %>%
+#               select(date, group, mm_growth, weight, category) %>%
+#               mutate(mm_growth_weighted = mm_growth * weight / 100) %>%
+#               ungroup() %>%
+#               rbind(df_mm) -> df_mm
+#   }
+# }
 
 ```
 
 ```{r}
-df_mm %>% 
-  filter(name != "All items") %>%
-  ggplot(mapping = aes(x = date, y = mm_growth_weighted, group = name, fill = category),
-         data = filter(df_mm, name != "All items"))+
-  geom_col(position = 'stack')+
-  scale_fill_jco()+
-  geom_line(mapping = aes(x = date, y = mm_growth),
-            data = filter(df_mm, name == "All items"), 
-            color = "black", show.legend = FALSE)+
-  geom_point(mapping = aes(x = date, y = mm_growth),
-            data = filter(df_mm, name == "All items"), 
-            color = "black", show.legend = FALSE)
+# df_mm %>% 
+#   ggplot(aes(x = date, y = mm_growth_weighted, group = group, fill = group))+
+#   geom_col(position = 'stack')+
+#   scale_fill_jco()
+```
+
+
+
+```{r}
+# df_mm %>% 
+#   filter(name != "All items") %>%
+#   ggplot(mapping = aes(x = date, y = mm_growth_weighted, group = name, fill = category),
+#          data = filter(df_mm, name != "All items"))+
+#   geom_col(position = 'stack')+
+#   scale_fill_jco()+
+#   geom_line(mapping = aes(x = date, y = mm_growth),
+#             data = filter(df_mm, name == "All items"), 
+#             color = "black", show.legend = FALSE)+
+#   geom_point(mapping = aes(x = date, y = mm_growth),
+#             data = filter(df_mm, name == "All items"), 
+#             color = "black", show.legend = FALSE)
 ```
 
 ### Compare sum of weighted components with headline m/m growth
 
 ```{r}
-df_mm %>% filter(name != "All items") %>% group_by(date) %>% summarise(sum_components = sum(mm_growth_weighted)) %>% select(date, sum_components) %>% merge(filter(df_mm, name == "All items"), by = "date") %>% select(sum_components, mm_growth) %>% round(digits = 2)
+# df_mm %>% filter(name != "All items") %>% group_by(date) %>% summarise(sum_components = sum(mm_growth_weighted)) %>% select(date, sum_components) %>% merge(filter(df_mm, name == "All items"), by = "date") %>% select(sum_components, mm_growth) %>% round(digits = 2)
 ```
 
 Only small deviations in the second decimal!
@@ -606,7 +621,7 @@ tmp3 %>%
   filter(name %in% c("Car and truck rental", 
                      "Airline fares", 
                      "Used cars and trucks",
-                     "New vehicles",
+                     #"New vehicles",
                      "Admissions",
                      "Other lodging away from home including hotels and motels")) -> df_plot 
 
@@ -638,6 +653,49 @@ ggplot(aes(x = diff_pandemic, y = value_mm))+
 
 
 ```{r}
-ggsave(filename = "plot_cpi_US.pdf", width = 12, height = 6, units = "in")
+#ggsave(filename = "plot_cpi_US_apr21may21.pdf", width = 12, height = 6, units = "in")
 ```
+
+### Export to csv
+
+```{r}
+df_plot %>%
+  select(name, date_str, diff_pandemic, value_mm) %>%
+  pivot_wider(names_from = "date_str", values_from = "value_mm") %>%
+  write.xlsx(file = "data_CPI_AprMay21.xlsx", sheetName = "Sheet1", 
+  col.names = TRUE, row.names = TRUE, append = FALSE)
+```
+
+### Calculations
+
+- average weight in April and May 2021
+
+```{r}
+df_plot %>% 
+  select(name, weight) %>%
+  group_by(name) %>%
+  summarise(mean_weight = round(mean(weight), digits = 1))
+```
+
+
+- Contribution of the categories above to the total price increase in April and May (`sum_mm_weighted`) 
+- their combined weight in the goods basket (`sum_weight`)
+
+```{r}
+df_plot %>%
+  mutate(mm_weighted = value_mm * weight/100) %>% 
+  group_by(date) %>% 
+  summarise(sum_mm_weighted = sum(mm_weighted),
+            sum_weight = sum(weight))
+```
+
+- total increase in the CPI in April and May
+
+```{r}
+df %>% 
+  filter(name == "All items") %>% 
+  summarise(mmApr21 = growth_rate(value, date, "2021-03-01", "2021-04-01"), 
+            mmMay21 = growth_rate(value, date, "2021-04-01", "2021-05-01"))
+```
+
 
